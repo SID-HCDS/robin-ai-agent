@@ -45,12 +45,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: node-app
-
-      - name: 'Login via Azure CLI'
-        uses: azure/login@v1
-        with:
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_4DD120EA9F9243B79A24633922846950 }}
-      
+            
       - name: 'Deploy to Azure Web App'
         uses: azure/webapps-deploy@v3
         id: deploy-to-webapp
@@ -59,3 +54,4 @@ jobs:
           slot-name: 'Production'
           package: backend
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_4DD120EA9F9243B79A24633922846950 }}
+
