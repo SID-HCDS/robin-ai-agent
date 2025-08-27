@@ -52,6 +52,7 @@ jobs:
         with:
           app-name: 'robinbackend'
           slot-name: 'Production'
-          package: backend
+          package: ./node-app
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_4DD120EA9F9243B79A24633922846950 }}
+
 
