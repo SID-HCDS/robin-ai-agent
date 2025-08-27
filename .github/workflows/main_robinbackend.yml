@@ -44,9 +44,7 @@ jobs:
           name: node-app
 
       - name: List files after artifact download
-        run: |
-          ls -la
-          ls -la node-app
+        run: ls -la
 
       - name: 'Deploy to Azure Web App'
         uses: azure/webapps-deploy@v3
@@ -54,5 +52,5 @@ jobs:
         with:
           app-name: 'robinbackend'
           slot-name: 'Production'
-          package: node-app
+          package: .
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_4DD120EA9F9243B79A24633922846950 }}
