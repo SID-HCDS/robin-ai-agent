@@ -43,7 +43,10 @@ jobs:
         with:
           name: node-app
 
-      - run: ls -la
+      - name: List files after artifact download
+        run: |
+          ls -la
+          ls -la node-app
 
       - name: 'Deploy to Azure Web App'
         uses: azure/webapps-deploy@v3
