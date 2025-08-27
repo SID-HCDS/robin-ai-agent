@@ -43,6 +43,8 @@ jobs:
         with:
           name: node-app
 
+      - run: ls -la
+
       - name: 'Deploy to Azure Web App'
         uses: azure/webapps-deploy@v3
         id: deploy-to-webapp
