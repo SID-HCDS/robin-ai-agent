@@ -13,7 +13,7 @@ router.post('/', async (req, res) => {
   try {
     // Example payload for Azure OpenAI (update to your deployment/model)
     const openaiResponse = await axios.post(
-      process.env.OPENAI_ENDPOINT, // e.g. https://your-resource.openai.azure.com/openai/deployments/your-deployment/chat/completions?api-version=2023-05-15
+      process.env.AZURE_OPENAI_ENDPOINT, // e.g. https://your-resource.openai.azure.com/openai/deployments/your-deployment/chat/completions?api-version=2023-05-15
       {
         messages: [
           { role: "user", content: message }
@@ -21,7 +21,7 @@ router.post('/', async (req, res) => {
       },
       {
         headers: {
-          'api-key': process.env.OPENAI_API_KEY,
+          'api-key': process.env.AZURE_OPENAI_API_KEY,
           'Content-Type': 'application/json'
         }
       }
