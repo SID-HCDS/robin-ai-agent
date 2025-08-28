@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import './style.css';
 
+const API_BASE = 'https://robinbackend-bzgkfnhndvcmdee3.eastus2-01.azurewebsites.net';
+
 function App() {
   const [language, setLanguage] = useState('');
   const [output, setOutput] = useState('');
@@ -10,7 +12,7 @@ function App() {
   };
 
   const getInsuranceInfo = async () => {
-    const res = await fetch('http://localhost:4000/api/insurance');
+    const res = await fetch(`${API_BASE}/api/insurance`);
     const data = await res.json();
     setOutput(
       'Insurance Types:\n' +
@@ -21,7 +23,7 @@ function App() {
   const calculatePremium = async () => {
     const age = prompt('Enter your age:');
     const coverage = prompt('Enter coverage amount:');
-    const res = await fetch('http://localhost:4000/api/calculate', {
+    const res = await fetch(`${API_BASE}/api/calculate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ age: Number(age), coverage: Number(coverage) }),
@@ -33,7 +35,7 @@ function App() {
   const recommendPlan = async () => {
     const age = prompt('Enter your age:');
     const budget = prompt('Enter your budget:');
-    const res = await fetch('http://localhost:4000/api/recommend', {
+    const res = await fetch(`${API_BASE}/api/recommend`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ age: Number(age), budget: Number(budget) }),
