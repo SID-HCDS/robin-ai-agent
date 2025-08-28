@@ -13,9 +13,7 @@ mongoose.connect(process.env.DB_CONNECTION_STRING)
   .then(() => console.log('Connected to CosmosDB!'))
   .catch((err) => console.error('CosmosDB connection error:', err));
 
-app.use(cors({
-  origin: 'https://victorious-island-06c43980f.1.azurestaticapps.net'
-}));
+app.use(cors());
 app.use(express.json());
 
 // --- AUTH ROUTES ---
