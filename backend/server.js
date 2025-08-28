@@ -58,9 +58,9 @@ app.post('/api/chat', async (req, res) => {
   try {
     // Azure OpenAI call
     const openaiResponse = await axios.post(
-      process.env.OPENAI_ENDPOINT, // e.g. https://your-resource.openai.azure.com/openai/deployments/your-deployment/chat/completions?api-version=2023-05-15
+      process.env.AZURE_OPENAI_ENDPOINT, // e.g. https://your-resource.openai.azure.com/openai/deployments/your-deployment/chat/completions?api-version=2023-05-15
       { messages: [{ role: "user", content: message }] },
-      { headers: { 'api-key': process.env.OPENAI_API_KEY, 'Content-Type': 'application/json' } }
+      { headers: { 'api-key': process.env.AZURE_OPENAI_API_KEY, 'Content-Type': 'application/json' } }
     );
     console.log('OpenAI API response:', openaiResponse.data);
     const reply = openaiResponse.data.choices?.[0]?.message?.content || 'No reply from AI';
