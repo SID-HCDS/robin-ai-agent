@@ -1,11 +1,12 @@
 // Simple Chat model (replace with DB code as needed)
-class Chat {
-  constructor(user, message, response, timestamp = new Date()) {
-    this.user = user;
-    this.message = message;
-    this.response = response;
-    this.timestamp = timestamp;
-  }
-}
+const mongoose = require('mongoose');
 
-module.exports = Chat;
+const chatSchema = new mongoose.Schema({
+  message: { type: String, required: true },
+  reply: { type: String, required: true },
+  lang: { type: String },
+  email: { type: String },
+  timestamp: { type: Date, default: Date.now }
+});
+
+module.exports = mongoose.model('Chat', chatSchema);
