@@ -43,7 +43,8 @@ router.post('/', async (req, res) => {
     // 3. Log prompts for debugging
     console.log('System Prompt:', systemPrompt);
     console.log('User Prompt:', userPrompt);
-
+    console.log("Documents sent to OpenAI:", allText);
+    
     // 4. Send to OpenAI
     const openaiResponse = await axios.post(
       process.env.AZURE_OPENAI_ENDPOINT,
