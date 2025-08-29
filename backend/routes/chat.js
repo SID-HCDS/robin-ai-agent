@@ -4,8 +4,11 @@ const Chat = require('../models/chat');
 const axios = require('axios');
 const { BlobServiceClient } = require('@azure/storage-blob');
 
+// Update this with your actual container name!
+const containerName = 'robincontainer';
+
+// Setup Blob Service Client using your connection string from environment variables
 const blobServiceClient = BlobServiceClient.fromConnectionString(process.env.AZURE_BLOB_CONNECTION_STRING);
-const containerName = 'your-container-name';
 
 // Helper: Get all file contents from Blob Storage
 async function getAllFilesText() {
@@ -13,8 +16,9 @@ async function getAllFilesText() {
   let allText = '';
   for await (const blob of containerClient.listBlobsFlat()) {
     const blockBlobClient = containerClient.getBlockBlobClient(blob.name);
+    // downloadToBuffer is available in recent SDKs; replace with .download() if needed
     const downloadBlockBlobResponse = await blockBlobClient.downloadToBuffer();
-    allText += downloadBlockBlobResponse.toString() + '\n'; // Add newline between files
+    allText += downloadBlockBlobResponse.toString() + '\n';
   }
   return allText;
 }
@@ -23,28 +27,30 @@ router.post('/', async (req, res) => {
   const { message, lang, email } = req.body;
 
   console.log('Received chat request:', { message, lang, email });
-  
+
   try {
     // 1. Get all text from Blob Storage
     const allText = await getAllFilesText();
 
-    // 2. Construct OpenAI prompt to answer ONLY from the provided documents
-    const prompt = `
-You are an insurance agent. Answer the user's question ONLY using the following documents. If the answer is not present, reply "Sorry, I couldn't find an answer in our documents."
-Documents:
-${allText}
+    // 2. Construct system and user prompts
+    const systemPrompt =
+      "You are an insurance agent. You must answer ONLY using the provided documents. " +
+      "If the answer is not present, reply: 'Sorry, I couldn't find an answer in our documents.' " +
+      "Do NOT use your own knowledge. Do NOT make up answers.";
+    const userPrompt =
+      `Documents:\n${allText}\n\nQuestion: ${message}`;
 
-Question: ${message}
-`;
- console.log('System Prompt:', systemPrompt);
- console.log('User Prompt:', userPrompt);
-    // 3. Send to OpenAI
+    // 3. Log prompts for debugging
+    console.log('System Prompt:', systemPrompt);
+    console.log('User Prompt:', userPrompt);
+
+    // 4. Send to OpenAI
     const openaiResponse = await axios.post(
       process.env.AZURE_OPENAI_ENDPOINT,
       {
         messages: [
-          { role: "system", content: "You are an insurance agent that answers ONLY from the provided documents." },
-          { role: "user", content: prompt }
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
         ]
       },
       {
@@ -55,7 +61,18 @@ Question: ${message}
       }
     );
 
-    const reply = openaiResponse.data.choices[0]?.message?.content || 'No reply from AI';
+    let reply = openaiResponse.data.choices[0]?.message?.content || 'No reply from AI';
+
+    // Optional: Post-processing safety net (prevents hallucinated answers)
+    if (
+      reply.toLowerCase().includes("as an insurance agent") ||
+      reply.toLowerCase().includes("i don't have that information") ||
+      reply.toLowerCase().includes("insurance is") ||
+      reply.trim() === "" ||
+      reply.toLowerCase().includes("i am an ai language model")
+    ) {
+      reply = "Sorry, I couldn't find an answer in our documents.";
+    }
 
     // Save to chat history
     const chat = new Chat({ message, reply, lang });
@@ -69,7 +86,9 @@ Question: ${message}
   }
 });
 
+// Get chat history for a user
 router.get('/history', async (req, res) => {
+  // TODO: filter by user if email provided
   const history = await Chat.find().sort({ createdAt: -1 }).limit(50);
   res.json({ history });
 });
