@@ -36,7 +36,8 @@ ${allText}
 
 Question: ${message}
 `;
-
+ console.log('System Prompt:', systemPrompt);
+ console.log('User Prompt:', userPrompt);
     // 3. Send to OpenAI
     const openaiResponse = await axios.post(
       process.env.AZURE_OPENAI_ENDPOINT,
