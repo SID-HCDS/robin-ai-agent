@@ -55,6 +55,7 @@ router.post('/', async (req, res) => {
 
     // 2. Fuzzy match: If none of the keywords are present, block the answer
     if (!hasRelevantInfo(message, allText)) {
+      console.log('BLOCKED: No relevant info found in blob storage for message:', message);
       const reply = "Sorry, I couldn't find an answer in our documents.";
       const chat = new Chat({ message, reply, lang });
       await chat.save();
