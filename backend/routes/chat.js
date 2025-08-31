@@ -22,26 +22,37 @@ async function getAllFilesText() {
   return allText;
 }
 
-// Helper: Check if any keyword from the message exists in the documents
+// Helper: Stricter check - require phrase match or at least 2 uncommon keywords present in blob text
 function hasRelevantInfo(message, allText) {
-  // Remove common stop words and split into keywords
   const stopWords = [
-    'the','is','at','which','on','and','a','an','to','for','from','in','of','by','with','as','about','this','that','it','are','was','be','has','have','will'
+    'the','is','at','which','on','and','a','an','to','for','from','in','of','by','with','as','about','this','that','it','are','was','be','has','have','will','you','your','we','us','our','can','should','could','would'
   ];
-  const messageKeywords = message
-    .toLowerCase()
-    .replace(/[^\w\s]/gi, '') // Remove punctuation
+  const cleanedMessage = message.toLowerCase().replace(/[^\w\s]/gi, '');
+  const messageKeywords = cleanedMessage
     .split(/\s+/)
-    .filter(word => !stopWords.includes(word) && word.length > 2);
+    .filter(word => !stopWords.includes(word) && word.length > 3);
 
-  let found = false;
+  // Phrase match: check if whole question exists in blob text
+  if (allText.toLowerCase().includes(cleanedMessage)) {
+    console.log("MATCH: Exact phrase found in blob for message:", message);
+    return true;
+  }
+
+  // Keyword match: require at least 2 rare keywords
+  let matchedKeywords = [];
   for (const word of messageKeywords) {
     if (allText.toLowerCase().includes(word)) {
-      found = true;
-      break;
+      matchedKeywords.push(word);
     }
   }
-  return found;
+  console.log("DEBUG: Matched keywords:", matchedKeywords);
+
+  if (matchedKeywords.length >= 2) {
+    console.log("MATCH: At least 2 uncommon keywords found for message:", message);
+    return true;
+  }
+
+  return false;
 }
 
 router.post('/', async (req, res) => {
@@ -53,7 +64,7 @@ router.post('/', async (req, res) => {
     // 1. Get all text from Blob Storage
     const allText = await getAllFilesText();
 
-    // 2. Fuzzy match: If none of the keywords are present, block the answer
+    // 2. Stricter match: Only allow if relevant info present
     if (!hasRelevantInfo(message, allText)) {
       console.log('BLOCKED: No relevant info found in blob storage for message:', message);
       const reply = "Sorry, I couldn't find an answer in our documents.";
