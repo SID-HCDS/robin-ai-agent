@@ -28,6 +28,7 @@ function hasRelevantInfo(message, allText) {
     'the','is','at','which','on','and','a','an','to','for','from','in','of','by','with','as','about','this','that','it','are','was','be','has','have','will','you','your','we','us','our','can','should','could','would'
   ];
   const cleanedMessage = message.toLowerCase().replace(/[^\w\s]/gi, '');
+  console.log("DEBUG: cleanedMessage:", cleanedMessage);
   const messageKeywords = cleanedMessage
     .split(/\s+/)
     .filter(word => !stopWords.includes(word) && word.length > 3);
@@ -56,6 +57,7 @@ function hasRelevantInfo(message, allText) {
 }
 
 router.post('/', async (req, res) => {
+  console.log("DEBUG: chat.js POST handler reached");
   const { message, lang, email } = req.body;
 
   console.log('Received chat request:', { message, lang, email });
@@ -63,6 +65,7 @@ router.post('/', async (req, res) => {
   try {
     // 1. Get all text from Blob Storage
     const allText = await getAllFilesText();
+    console.log("DEBUG: allText length:", allText.length);
 
     // 2. Stricter match: Only allow if relevant info present
     const allowed = hasRelevantInfo(message, allText);
