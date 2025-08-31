@@ -28,14 +28,14 @@ function hasRelevantInfo(message, allText) {
     'the','is','at','which','on','and','a','an','to','for','from','in','of','by','with','as','about','this','that','it','are','was','be','has','have','will','you','your','we','us','our','can','should','could','would'
   ];
   const cleanedMessage = message.toLowerCase().replace(/[^\w\s]/gi, '');
-  console.log("DEBUG: cleanedMessage:", cleanedMessage);
+  console.log("DEBUG: cleanedMessage:", cleanedMessage); // Log the cleaned message
   const messageKeywords = cleanedMessage
     .split(/\s+/)
     .filter(word => !stopWords.includes(word) && word.length > 3);
 
   // Phrase match: check if whole question exists in blob text
   if (allText.toLowerCase().includes(cleanedMessage)) {
-    console.log("MATCH: Exact phrase found in blob for message:", message);
+    console.log("MATCH: Exact phrase found in blob for message:", message); // Log phrase match
     return true;
   }
 
@@ -46,10 +46,10 @@ function hasRelevantInfo(message, allText) {
       matchedKeywords.push(word);
     }
   }
-  console.log("DEBUG: Matched keywords:", matchedKeywords);
+  console.log("DEBUG: Matched keywords:", matchedKeywords); // Log matched keywords
 
   if (matchedKeywords.length >= 2) {
-    console.log("MATCH: At least 2 uncommon keywords found for message:", message);
+    console.log("MATCH: At least 2 uncommon keywords found for message:", message); // Log keyword match
     return true;
   }
 
@@ -57,26 +57,26 @@ function hasRelevantInfo(message, allText) {
 }
 
 router.post('/', async (req, res) => {
-  console.log("DEBUG: chat.js POST handler reached");
+  console.log("DEBUG: chat.js POST handler reached"); // Log POST handler entry
   const { message, lang, email } = req.body;
 
-  console.log('Received chat request:', { message, lang, email });
+  console.log('Received chat request:', { message, lang, email }); // Log received request
 
   try {
     // 1. Get all text from Blob Storage
     const allText = await getAllFilesText();
-    console.log("DEBUG: allText length:", allText.length);
+    console.log("DEBUG: allText length:", allText.length); // Log length of blob text
 
     // 2. Stricter match: Only allow if relevant info present
     const allowed = hasRelevantInfo(message, allText);
     if (!allowed) {
-      console.log('BLOCKED: No relevant info found in blob storage for message:', message);
+      console.log('BLOCKED: No relevant info found in blob storage for message:', message); // Log blocked
       const reply = "Sorry, I couldn't find an answer in our documents.";
       const chat = new Chat({ message, reply, lang });
       await chat.save();
       return res.json({ reply });
     }
-    console.log('ALLOWED: Relevant info found, sending to OpenAI for message:', message);
+    console.log('ALLOWED: Relevant info found, sending to OpenAI for message:', message); // Log allowed
 
     // 3. Construct system and user prompts
     const systemPrompt =
