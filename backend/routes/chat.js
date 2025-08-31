@@ -1,4 +1,4 @@
-console.log("DEBUG: chat.js loaded at", new Date().toISOString()); // <-- Add this line
+console.log("DEBUG: chat.js loaded at", new Date().toISOString());
 
 const express = require('express');
 const router = express.Router();
@@ -24,34 +24,38 @@ async function getAllFilesText() {
   return allText;
 }
 
-// Helper: Stricter check - require phrase match or at least 2 uncommon keywords present in blob text
+// Helper: Improved matching for relevant info
 function hasRelevantInfo(message, allText) {
   const stopWords = [
     'the','is','at','which','on','and','a','an','to','for','from','in','of','by','with','as','about','this','that','it','are','was','be','has','have','will','you','your','we','us','our','can','should','could','would'
   ];
   const cleanedMessage = message.toLowerCase().replace(/[^\w\s]/gi, '');
-  console.log("DEBUG: cleanedMessage:", cleanedMessage); // Log the cleaned message
+  console.log("DEBUG: cleanedMessage:", cleanedMessage);
+
   const messageKeywords = cleanedMessage
     .split(/\s+/)
-    .filter(word => !stopWords.includes(word) && word.length > 3);
+    .filter(word => !stopWords.includes(word) && word.length > 2); // relax to >2 chars
 
-  // Phrase match: check if whole question exists in blob text
-  if (allText.toLowerCase().includes(cleanedMessage)) {
-    console.log("MATCH: Exact phrase found in blob for message:", message); // Log phrase match
-    return true;
+  // Phrase match: check if any sentence from the question exists in blob text
+  const sentences = message.split(/[.?!]/).map(s => s.trim().toLowerCase()).filter(s => s.length > 3);
+  for (const sentence of sentences) {
+    if (allText.toLowerCase().includes(sentence)) {
+      console.log("MATCH: Sentence found in blob for message:", sentence);
+      return true;
+    }
   }
 
-  // Keyword match: require at least 2 rare keywords
+  // Keyword match: require at least 1 uncommon keyword
   let matchedKeywords = [];
   for (const word of messageKeywords) {
     if (allText.toLowerCase().includes(word)) {
       matchedKeywords.push(word);
     }
   }
-  console.log("DEBUG: Matched keywords:", matchedKeywords); // Log matched keywords
+  console.log("DEBUG: Matched keywords:", matchedKeywords);
 
-  if (matchedKeywords.length >= 2) {
-    console.log("MATCH: At least 2 uncommon keywords found for message:", message); // Log keyword match
+  if (matchedKeywords.length >= 1) {
+    console.log("MATCH: At least 1 uncommon keyword found for message:", message);
     return true;
   }
 
@@ -59,26 +63,26 @@ function hasRelevantInfo(message, allText) {
 }
 
 router.post('/', async (req, res) => {
-  console.log("DEBUG: chat.js POST handler reached"); // Log POST handler entry
+  console.log("DEBUG: chat.js POST handler reached");
   const { message, lang, email } = req.body;
 
-  console.log('Received chat request:', { message, lang, email }); // Log received request
+  console.log('Received chat request:', { message, lang, email });
 
   try {
     // 1. Get all text from Blob Storage
     const allText = await getAllFilesText();
-    console.log("DEBUG: allText length:", allText.length); // Log length of blob text
+    console.log("DEBUG: allText length:", allText.length);
 
-    // 2. Stricter match: Only allow if relevant info present
+    // 2. Improved match: Only allow if relevant info present
     const allowed = hasRelevantInfo(message, allText);
     if (!allowed) {
-      console.log('BLOCKED: No relevant info found in blob storage for message:', message); // Log blocked
+      console.log('BLOCKED: No relevant info found in blob storage for message:', message);
       const reply = "Sorry, I couldn't find an answer in our documents.";
-      const chat = new Chat({ message, reply, lang });
+      const chat = new Chat({ message, reply, lang, email });
       await chat.save();
       return res.json({ reply });
     }
-    console.log('ALLOWED: Relevant info found, sending to OpenAI for message:', message); // Log allowed
+    console.log('ALLOWED: Relevant info found, sending to OpenAI for message:', message);
 
     // 3. Construct system and user prompts
     const systemPrompt =
@@ -119,7 +123,7 @@ router.post('/', async (req, res) => {
     }
 
     // Save to chat history
-    const chat = new Chat({ message, reply, lang });
+    const chat = new Chat({ message, reply, lang, email });
     await chat.save();
 
     res.json({ reply });
@@ -132,8 +136,9 @@ router.post('/', async (req, res) => {
 
 // Get chat history for a user
 router.get('/history', async (req, res) => {
-  // TODO: filter by user if email provided
-  const history = await Chat.find().sort({ createdAt: -1 }).limit(50);
+  const { email } = req.query;
+  const filter = email ? { email } : {};
+  const history = await Chat.find(filter).sort({ createdAt: -1 }).limit(50);
   res.json({ history });
 });
 
