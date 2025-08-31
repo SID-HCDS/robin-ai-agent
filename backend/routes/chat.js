@@ -65,7 +65,8 @@ router.post('/', async (req, res) => {
     const allText = await getAllFilesText();
 
     // 2. Stricter match: Only allow if relevant info present
-    if (!hasRelevantInfo(message, allText)) {
+    const allowed = hasRelevantInfo(message, allText);
+    if (!allowed) {
       console.log('BLOCKED: No relevant info found in blob storage for message:', message);
       const reply = "Sorry, I couldn't find an answer in our documents.";
       const chat = new Chat({ message, reply, lang });
