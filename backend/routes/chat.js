@@ -22,6 +22,28 @@ async function getAllFilesText() {
   return allText;
 }
 
+// Helper: Check if any keyword from the message exists in the documents
+function hasRelevantInfo(message, allText) {
+  // Remove common stop words and split into keywords
+  const stopWords = [
+    'the','is','at','which','on','and','a','an','to','for','from','in','of','by','with','as','about','this','that','it','are','was','be','has','have','will'
+  ];
+  const messageKeywords = message
+    .toLowerCase()
+    .replace(/[^\w\s]/gi, '') // Remove punctuation
+    .split(/\s+/)
+    .filter(word => !stopWords.includes(word) && word.length > 2);
+
+  let found = false;
+  for (const word of messageKeywords) {
+    if (allText.toLowerCase().includes(word)) {
+      found = true;
+      break;
+    }
+  }
+  return found;
+}
+
 router.post('/', async (req, res) => {
   const { message, lang, email } = req.body;
 
@@ -31,17 +53,15 @@ router.post('/', async (req, res) => {
     // 1. Get all text from Blob Storage
     const allText = await getAllFilesText();
 
-    // 2. Check if the user's question (or keywords) exist in the document text
-    // You can improve this with fuzzy search, but start with a simple check.
-    if (!allText.toLowerCase().includes(message.toLowerCase())) {
+    // 2. Fuzzy match: If none of the keywords are present, block the answer
+    if (!hasRelevantInfo(message, allText)) {
       const reply = "Sorry, I couldn't find an answer in our documents.";
-      // Save to chat history
       const chat = new Chat({ message, reply, lang });
       await chat.save();
       return res.json({ reply });
     }
 
-    // 3. Construct system and user prompts (same as before)
+    // 3. Construct system and user prompts
     const systemPrompt =
       "You are an insurance agent. You must answer ONLY using the provided documents. " +
       "If the answer is not present, reply: 'Sorry, I couldn't find an answer in our documents.' " +
@@ -68,7 +88,7 @@ router.post('/', async (req, res) => {
 
     let reply = openaiResponse.data.choices[0]?.message?.content || 'No reply from AI';
 
-    // Optional: Post-processing safety net (prevents hallucinated answers)
+    // Safety net for hallucinations
     if (
       reply.toLowerCase().includes("as an insurance agent") ||
       reply.toLowerCase().includes("i don't have that information") ||
