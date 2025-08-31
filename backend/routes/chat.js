@@ -5,6 +5,7 @@ const router = express.Router();
 const Chat = require('../models/chat');
 const axios = require('axios');
 const { BlobServiceClient } = require('@azure/storage-blob');
+const pdfParse = require('pdf-parse');
 
 const containerName = 'robincontainer';
 const blobServiceClient = BlobServiceClient.fromConnectionString(process.env.AZURE_BLOB_CONNECTION_STRING);
@@ -14,8 +15,18 @@ async function getAllFilesText() {
   let allText = '';
   for await (const blob of containerClient.listBlobsFlat()) {
     const blockBlobClient = containerClient.getBlockBlobClient(blob.name);
-    const downloadBlockBlobResponse = await blockBlobClient.downloadToBuffer();
-    allText += downloadBlockBlobResponse.toString() + '\n';
+    const buffer = await blockBlobClient.downloadToBuffer();
+
+    if (blob.name.endsWith('.pdf')) {
+      try {
+        const pdfData = await pdfParse(buffer);
+        allText += pdfData.text + '\n';
+      } catch (err) {
+        console.error('PDF parse error for', blob.name, err);
+      }
+    } else {
+      allText += buffer.toString() + '\n';
+    }
   }
   return allText;
 }
