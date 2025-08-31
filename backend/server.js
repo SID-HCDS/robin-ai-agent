@@ -1,140 +1,109 @@
-console.log("DEBUG: chat.js loaded at", new Date().toISOString()); // <-- Add this line
-
+require('dotenv').config();
 const express = require('express');
-const router = express.Router();
-const Chat = require('../models/chat');
-const axios = require('axios');
-const { BlobServiceClient } = require('@azure/storage-blob');
+const mongoose = require('mongoose');
+const cors = require('cors');
+const app = express();
 
-// Update this with your actual container name!
-const containerName = 'robincontainer';
+// Models
+const User = require('./models/User');
+const Chat = require('./models/chat');
 
-// Setup Blob Service Client using your connection string from environment variables
-const blobServiceClient = BlobServiceClient.fromConnectionString(process.env.AZURE_BLOB_CONNECTION_STRING);
+// Import Routers
+const chatRouter = require('./routes/chat');
+const callRouter = require('./routes/call');
+const compareRouter = require('./routes/compare');
+const feedbackRouter = require('./routes/feedback');
+const languagesRouter = require('./routes/languages');
+const paymentRouter = require('./routes/payment');
 
-// Helper: Get all file contents from Blob Storage
-async function getAllFilesText() {
-  const containerClient = blobServiceClient.getContainerClient(containerName);
-  let allText = '';
-  for await (const blob of containerClient.listBlobsFlat()) {
-    const blockBlobClient = containerClient.getBlockBlobClient(blob.name);
-    const downloadBlockBlobResponse = await blockBlobClient.downloadToBuffer();
-    allText += downloadBlockBlobResponse.toString() + '\n';
-  }
-  return allText;
-}
+// --- DB CONNECTION ---
+mongoose.connect(process.env.DB_CONNECTION_STRING)
+  .then(() => console.log('Connected to CosmosDB!'))
+  .catch((err) => console.error('CosmosDB connection error:', err));
 
-// Helper: Stricter check - require phrase match or at least 2 uncommon keywords present in blob text
-function hasRelevantInfo(message, allText) {
-  const stopWords = [
-    'the','is','at','which','on','and','a','an','to','for','from','in','of','by','with','as','about','this','that','it','are','was','be','has','have','will','you','your','we','us','our','can','should','could','would'
-  ];
-  const cleanedMessage = message.toLowerCase().replace(/[^\w\s]/gi, '');
-  console.log("DEBUG: cleanedMessage:", cleanedMessage); // Log the cleaned message
-  const messageKeywords = cleanedMessage
-    .split(/\s+/)
-    .filter(word => !stopWords.includes(word) && word.length > 3);
+app.use(cors());
+app.use(express.json());
 
-  // Phrase match: check if whole question exists in blob text
-  if (allText.toLowerCase().includes(cleanedMessage)) {
-    console.log("MATCH: Exact phrase found in blob for message:", message); // Log phrase match
-    return true;
-  }
-
-  // Keyword match: require at least 2 rare keywords
-  let matchedKeywords = [];
-  for (const word of messageKeywords) {
-    if (allText.toLowerCase().includes(word)) {
-      matchedKeywords.push(word);
-    }
-  }
-  console.log("DEBUG: Matched keywords:", matchedKeywords); // Log matched keywords
-
-  if (matchedKeywords.length >= 2) {
-    console.log("MATCH: At least 2 uncommon keywords found for message:", message); // Log keyword match
-    return true;
-  }
-
-  return false;
-}
-
-router.post('/', async (req, res) => {
-  console.log("DEBUG: chat.js POST handler reached"); // Log POST handler entry
-  const { message, lang, email } = req.body;
-
-  console.log('Received chat request:', { message, lang, email }); // Log received request
+// --- AUTH ROUTES ---
+app.post('/api/auth/register', async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) return res.status(400).json({ error: "Email and password required" });
 
   try {
-    // 1. Get all text from Blob Storage
-    const allText = await getAllFilesText();
-    console.log("DEBUG: allText length:", allText.length); // Log length of blob text
+    const existing = await User.findOne({ email });
+    if (existing) return res.status(400).json({ error: "User already exists" });
 
-    // 2. Stricter match: Only allow if relevant info present
-    const allowed = hasRelevantInfo(message, allText);
-    if (!allowed) {
-      console.log('BLOCKED: No relevant info found in blob storage for message:', message); // Log blocked
-      const reply = "Sorry, I couldn't find an answer in our documents.";
-      const chat = new Chat({ message, reply, lang });
-      await chat.save();
-      return res.json({ reply });
-    }
-    console.log('ALLOWED: Relevant info found, sending to OpenAI for message:', message); // Log allowed
-
-    // 3. Construct system and user prompts
-    const systemPrompt =
-      "You are an insurance agent. You must answer ONLY using the provided documents. " +
-      "If the answer is not present, reply: 'Sorry, I couldn't find an answer in our documents.' " +
-      "Do NOT use your own knowledge. Do NOT make up answers.";
-    const userPrompt =
-      `Documents:\n${allText}\n\nQuestion: ${message}`;
-
-    // 4. Send to OpenAI
-    const openaiResponse = await axios.post(
-      process.env.AZURE_OPENAI_ENDPOINT,
-      {
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
-        ]
-      },
-      {
-        headers: {
-          'api-key': process.env.AZURE_OPENAI_API_KEY,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-
-    let reply = openaiResponse.data.choices[0]?.message?.content || 'No reply from AI';
-
-    // Safety net for hallucinations
-    if (
-      reply.toLowerCase().includes("as an insurance agent") ||
-      reply.toLowerCase().includes("i don't have that information") ||
-      reply.toLowerCase().includes("insurance is") ||
-      reply.trim() === "" ||
-      reply.toLowerCase().includes("i am an ai language model")
-    ) {
-      reply = "Sorry, I couldn't find an answer in our documents.";
-    }
-
-    // Save to chat history
-    const chat = new Chat({ message, reply, lang });
-    await chat.save();
-
-    res.json({ reply });
-
+    const hashedPassword = await require('bcryptjs').hash(password, 10);
+    const user = new User({ email, password: hashedPassword });
+    await user.save();
+    const token = require('jsonwebtoken').sign({ email }, process.env.JWT_SECRET, { expiresIn: '2h' });
+    res.json({ token, email });
   } catch (err) {
-    console.error('Chat error:', err?.response?.data || err.message);
-    res.status(500).json({ error: 'Failed to get response from OpenAI or Blob Storage.' });
+    res.status(500).json({ error: "Registration failed" });
   }
 });
 
-// Get chat history for a user
-router.get('/history', async (req, res) => {
-  // TODO: filter by user if email provided
-  const history = await Chat.find().sort({ createdAt: -1 }).limit(50);
-  res.json({ history });
+app.post('/api/auth/login', async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) return res.status(400).json({ error: "Email and password required" });
+
+  try {
+    const user = await User.findOne({ email });
+    if (!user || !(await require('bcryptjs').compare(password, user.password))) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    const token = require('jsonwebtoken').sign({ email }, process.env.JWT_SECRET, { expiresIn: '2h' });
+    res.json({ token, email });
+  } catch (err) {
+    res.status(500).json({ error: "Login failed" });
+  }
 });
 
-module.exports = router;
+// --- CHAT ROUTES --- (all chat logic is now in routes/chat.js)
+app.use('/api/chat', chatRouter);
+
+// --- Other routers (if implemented), fallback to old endpoints if needed ---
+app.use('/api/request-call', callRouter);
+app.use('/api/compare', compareRouter);
+app.use('/api/feedback', feedbackRouter);
+app.use('/api/languages', languagesRouter);
+app.use('/api/payment', paymentRouter);
+
+// --- INSURANCE ROUTES ---
+app.get('/api/insurance', (req, res) => {
+  res.json({
+    products: [
+      { type: "Life Insurance", description: "Protects your family." },
+      { type: "Health Insurance", description: "Covers medical expenses." },
+      { type: "Term Insurance", description: "Long-term coverage." }
+    ]
+  });
+});
+
+// Calculate premium
+app.post('/api/calculate', (req, res) => {
+  const { age, coverage, type } = req.body;
+  let premium = 500 + (coverage || 100000) / 1000 + (age || 30) * 10;
+  res.json({ premium });
+});
+
+// Recommend plan
+app.post('/api/recommend', (req, res) => {
+  const { age, budget } = req.body;
+  if (age < 30 && budget > 500) {
+    res.json({ recommended: "Term Insurance" });
+  } else {
+    res.json({ recommended: "Health Insurance" });
+  }
+});
+
+// --- HEALTH CHECK ---
+app.get('/', (req, res) => {
+  res.send('Robin AI Agent backend is running!');
+});
+
+// --- START SERVER ---
+const PORT = process.env.PORT || 4000;
+app.listen(PORT, () => {
+  console.log(`Robin AI Agent backend running on port ${PORT}`);
+});
