@@ -1,157 +1,140 @@
-require('dotenv').config();
+console.log("DEBUG: chat.js loaded at", new Date().toISOString()); // <-- Add this line
+
 const express = require('express');
-const mongoose = require('mongoose');
+const router = express.Router();
+const Chat = require('../models/chat');
 const axios = require('axios');
-const cors = require('cors');
-const app = express();
+const { BlobServiceClient } = require('@azure/storage-blob');
 
-// Models
-const User = require('./models/User');
-const Chat = require('./models/chat');
+// Update this with your actual container name!
+const containerName = 'robincontainer';
 
-mongoose.connect(process.env.DB_CONNECTION_STRING)
-  .then(() => console.log('Connected to CosmosDB!'))
-  .catch((err) => console.error('CosmosDB connection error:', err));
+// Setup Blob Service Client using your connection string from environment variables
+const blobServiceClient = BlobServiceClient.fromConnectionString(process.env.AZURE_BLOB_CONNECTION_STRING);
 
-app.use(cors());
-app.use(express.json());
-
-// --- AUTH ROUTES ---
-app.post('/api/auth/register', async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) return res.status(400).json({ error: "Email and password required" });
-
-  try {
-    const existing = await User.findOne({ email });
-    if (existing) return res.status(400).json({ error: "User already exists" });
-
-    const hashedPassword = await require('bcryptjs').hash(password, 10);
-    const user = new User({ email, password: hashedPassword });
-    await user.save();
-    const token = require('jsonwebtoken').sign({ email }, process.env.JWT_SECRET, { expiresIn: '2h' });
-    res.json({ token, email });
-  } catch (err) {
-    res.status(500).json({ error: "Registration failed" });
+// Helper: Get all file contents from Blob Storage
+async function getAllFilesText() {
+  const containerClient = blobServiceClient.getContainerClient(containerName);
+  let allText = '';
+  for await (const blob of containerClient.listBlobsFlat()) {
+    const blockBlobClient = containerClient.getBlockBlobClient(blob.name);
+    const downloadBlockBlobResponse = await blockBlobClient.downloadToBuffer();
+    allText += downloadBlockBlobResponse.toString() + '\n';
   }
-});
+  return allText;
+}
 
-app.post('/api/auth/login', async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) return res.status(400).json({ error: "Email and password required" });
+// Helper: Stricter check - require phrase match or at least 2 uncommon keywords present in blob text
+function hasRelevantInfo(message, allText) {
+  const stopWords = [
+    'the','is','at','which','on','and','a','an','to','for','from','in','of','by','with','as','about','this','that','it','are','was','be','has','have','will','you','your','we','us','our','can','should','could','would'
+  ];
+  const cleanedMessage = message.toLowerCase().replace(/[^\w\s]/gi, '');
+  console.log("DEBUG: cleanedMessage:", cleanedMessage); // Log the cleaned message
+  const messageKeywords = cleanedMessage
+    .split(/\s+/)
+    .filter(word => !stopWords.includes(word) && word.length > 3);
 
-  try {
-    const user = await User.findOne({ email });
-    if (!user || !(await require('bcryptjs').compare(password, user.password))) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+  // Phrase match: check if whole question exists in blob text
+  if (allText.toLowerCase().includes(cleanedMessage)) {
+    console.log("MATCH: Exact phrase found in blob for message:", message); // Log phrase match
+    return true;
+  }
+
+  // Keyword match: require at least 2 rare keywords
+  let matchedKeywords = [];
+  for (const word of messageKeywords) {
+    if (allText.toLowerCase().includes(word)) {
+      matchedKeywords.push(word);
     }
-    const token = require('jsonwebtoken').sign({ email }, process.env.JWT_SECRET, { expiresIn: '2h' });
-    res.json({ token, email });
-  } catch (err) {
-    res.status(500).json({ error: "Login failed" });
   }
-});
+  console.log("DEBUG: Matched keywords:", matchedKeywords); // Log matched keywords
 
-// --- CHAT ROUTES ---
-app.post('/api/chat', async (req, res) => {
+  if (matchedKeywords.length >= 2) {
+    console.log("MATCH: At least 2 uncommon keywords found for message:", message); // Log keyword match
+    return true;
+  }
+
+  return false;
+}
+
+router.post('/', async (req, res) => {
+  console.log("DEBUG: chat.js POST handler reached"); // Log POST handler entry
   const { message, lang, email } = req.body;
-  console.log('Received OpenAI chat request:', { message, lang, email });
+
+  console.log('Received chat request:', { message, lang, email }); // Log received request
+
   try {
-    // Azure OpenAI call
+    // 1. Get all text from Blob Storage
+    const allText = await getAllFilesText();
+    console.log("DEBUG: allText length:", allText.length); // Log length of blob text
+
+    // 2. Stricter match: Only allow if relevant info present
+    const allowed = hasRelevantInfo(message, allText);
+    if (!allowed) {
+      console.log('BLOCKED: No relevant info found in blob storage for message:', message); // Log blocked
+      const reply = "Sorry, I couldn't find an answer in our documents.";
+      const chat = new Chat({ message, reply, lang });
+      await chat.save();
+      return res.json({ reply });
+    }
+    console.log('ALLOWED: Relevant info found, sending to OpenAI for message:', message); // Log allowed
+
+    // 3. Construct system and user prompts
+    const systemPrompt =
+      "You are an insurance agent. You must answer ONLY using the provided documents. " +
+      "If the answer is not present, reply: 'Sorry, I couldn't find an answer in our documents.' " +
+      "Do NOT use your own knowledge. Do NOT make up answers.";
+    const userPrompt =
+      `Documents:\n${allText}\n\nQuestion: ${message}`;
+
+    // 4. Send to OpenAI
     const openaiResponse = await axios.post(
-      process.env.AZURE_OPENAI_ENDPOINT, // e.g. https://your-resource.openai.azure.com/openai/deployments/your-deployment/chat/completions?api-version=2023-05-15
-      { messages: [{ role: "user", content: message }] },
-      { headers: { 'api-key': process.env.AZURE_OPENAI_API_KEY, 'Content-Type': 'application/json' } }
+      process.env.AZURE_OPENAI_ENDPOINT,
+      {
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ]
+      },
+      {
+        headers: {
+          'api-key': process.env.AZURE_OPENAI_API_KEY,
+          'Content-Type': 'application/json'
+        }
+      }
     );
-    console.log('OpenAI API response:', openaiResponse.data);
-    const reply = openaiResponse.data.choices?.[0]?.message?.content || 'No reply from AI';
-    const chat = new Chat({ message, reply, lang, email });
+
+    let reply = openaiResponse.data.choices[0]?.message?.content || 'No reply from AI';
+
+    // Safety net for hallucinations
+    if (
+      reply.toLowerCase().includes("as an insurance agent") ||
+      reply.toLowerCase().includes("i don't have that information") ||
+      reply.toLowerCase().includes("insurance is") ||
+      reply.trim() === "" ||
+      reply.toLowerCase().includes("i am an ai language model")
+    ) {
+      reply = "Sorry, I couldn't find an answer in our documents.";
+    }
+
+    // Save to chat history
+    const chat = new Chat({ message, reply, lang });
     await chat.save();
+
     res.json({ reply });
+
   } catch (err) {
-    console.error('OpenAI API error:', err?.response?.data || err.message);
-    res.status(500).json({ error: 'Failed to get response from OpenAI' });
+    console.error('Chat error:', err?.response?.data || err.message);
+    res.status(500).json({ error: 'Failed to get response from OpenAI or Blob Storage.' });
   }
 });
 
 // Get chat history for a user
-app.get('/api/chat/history', async (req, res) => {
-  const { email } = req.query;
-  const filter = email ? { email } : {};
-  const history = await Chat.find(filter).sort({ createdAt: -1 }).limit(50);
+router.get('/history', async (req, res) => {
+  // TODO: filter by user if email provided
+  const history = await Chat.find().sort({ createdAt: -1 }).limit(50);
   res.json({ history });
 });
 
-// --- CALL ROUTES ---
-app.post('/api/request-call', async (req, res) => {
-  const { phone } = req.body;
-  // TODO: Integrate with Azure Communication Services
-  res.json({ status: "Call scheduled to " + phone });
-});
-
-// --- PAYMENT ROUTES ---
-app.post('/api/payment', async (req, res) => {
-  const { amount } = req.body;
-  if (!amount || amount <= 0) return res.status(400).json({ error: "Invalid amount" });
-  res.json({
-    clientSecret: 'demo_secret_key',
-    message: 'Payment feature is not active yet. This is a placeholder response.'
-  });
-});
-
-// --- INSURANCE ROUTES ---
-app.get('/api/insurance', (req, res) => {
-  res.json({
-    products: [
-      { type: "Life Insurance", description: "Protects your family." },
-      { type: "Health Insurance", description: "Covers medical expenses." },
-      { type: "Term Insurance", description: "Long-term coverage." }
-    ]
-  });
-});
-
-// Calculate premium
-app.post('/api/calculate', (req, res) => {
-  const { age, coverage, type } = req.body;
-  let premium = 500 + (coverage || 100000) / 1000 + (age || 30) * 10;
-  res.json({ premium });
-});
-
-// Recommend plan
-app.post('/api/recommend', (req, res) => {
-  const { age, budget } = req.body;
-  if (age < 30 && budget > 500) {
-    res.json({ recommended: "Term Insurance" });
-  } else {
-    res.json({ recommended: "Health Insurance" });
-  }
-});
-
-// --- COMPARE ENDPOINT ---
-app.post('/api/compare', (req, res) => {
-  const { planA, planB } = req.body;
-  // Dummy comparison
-  res.json({ comparison: `Comparison between ${planA} and ${planB}: Both have pros and cons.` });
-});
-
-// --- FEEDBACK ENDPOINT ---
-app.post('/api/feedback', (req, res) => {
-  const { rating, feedback } = req.body;
-  // Save to DB if needed (not implemented)
-  res.json({ status: "Feedback received. Thank you!" });
-});
-
-// --- LANGUAGES ENDPOINT ---
-app.get('/api/languages', (req, res) => {
-  res.json({ languages: ["English", "Hindi", "Tamil", "Telugu"] });
-});
-
-// --- HEALTH CHECK ---
-app.get('/', (req, res) => {
-  res.send('Robin AI Agent backend is running!');
-});
-
-// --- START SERVER ---
-const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
-  console.log(`Robin AI Agent backend running on port ${PORT}`);
-});
+module.exports = router;
