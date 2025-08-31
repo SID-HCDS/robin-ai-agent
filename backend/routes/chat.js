@@ -1,3 +1,5 @@
+console.log("DEBUG: chat.js loaded at", new Date().toISOString()); // <-- Add this line
+
 const express = require('express');
 const router = express.Router();
 const Chat = require('../models/chat');
