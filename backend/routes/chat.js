@@ -16,7 +16,6 @@ async function getAllFilesText() {
   let allText = '';
   for await (const blob of containerClient.listBlobsFlat()) {
     const blockBlobClient = containerClient.getBlockBlobClient(blob.name);
-    // downloadToBuffer is available in recent SDKs; replace with .download() if needed
     const downloadBlockBlobResponse = await blockBlobClient.downloadToBuffer();
     allText += downloadBlockBlobResponse.toString() + '\n';
   }
@@ -32,7 +31,17 @@ router.post('/', async (req, res) => {
     // 1. Get all text from Blob Storage
     const allText = await getAllFilesText();
 
-    // 2. Construct system and user prompts
+    // 2. Check if the user's question (or keywords) exist in the document text
+    // You can improve this with fuzzy search, but start with a simple check.
+    if (!allText.toLowerCase().includes(message.toLowerCase())) {
+      const reply = "Sorry, I couldn't find an answer in our documents.";
+      // Save to chat history
+      const chat = new Chat({ message, reply, lang });
+      await chat.save();
+      return res.json({ reply });
+    }
+
+    // 3. Construct system and user prompts (same as before)
     const systemPrompt =
       "You are an insurance agent. You must answer ONLY using the provided documents. " +
       "If the answer is not present, reply: 'Sorry, I couldn't find an answer in our documents.' " +
@@ -40,11 +49,6 @@ router.post('/', async (req, res) => {
     const userPrompt =
       `Documents:\n${allText}\n\nQuestion: ${message}`;
 
-    // 3. Log prompts for debugging
-    console.log('System Prompt:', systemPrompt);
-    console.log('User Prompt:', userPrompt);
-    console.log("Documents sent to OpenAI:", allText);
-    
     // 4. Send to OpenAI
     const openaiResponse = await axios.post(
       process.env.AZURE_OPENAI_ENDPOINT,
