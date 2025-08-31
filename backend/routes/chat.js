@@ -60,6 +60,7 @@ router.post('/', async (req, res) => {
       await chat.save();
       return res.json({ reply });
     }
+    console.log('ALLOWED: Relevant info found, sending to OpenAI for message:', message);
 
     // 3. Construct system and user prompts
     const systemPrompt =
