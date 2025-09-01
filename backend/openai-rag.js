@@ -1,5 +1,6 @@
 
-      import { OpenAIClient, AzureKeyCredential } from "@azure/openai";
+      import { OpenAIClient } from "@azure/openai";
+      import { AzureKeyCredential } from "@azure/core-auth";
       import { DefaultAzureCredential, getBearerTokenProvider } from "@azure/identity";
       import 'dotenv/config';
 
