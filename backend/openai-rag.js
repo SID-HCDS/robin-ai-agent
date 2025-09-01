@@ -1,8 +1,8 @@
 
-      import { OpenAIClient } from "@azure/openai";
-      import { AzureKeyCredential } from "@azure/core-auth";
-      import { DefaultAzureCredential, getBearerTokenProvider } from "@azure/identity";
-      import 'dotenv/config';
+      const { OpenAIClient } = require("@azure/openai");
+      const { AzureKeyCredential } = require("@azure/core-auth");
+      const { DefaultAzureCredential, getBearerTokenProvider } = require("@azure/identity");
+      require('dotenv').config();
 
       export async function main() {
           const endpoint = process.env["AZURE_OPENAI_ENDPOINT"];
