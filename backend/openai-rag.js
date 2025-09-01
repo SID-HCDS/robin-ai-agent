@@ -6,8 +6,8 @@
           const endpoint = process.env["AZURE_OPENAI_ENDPOINT"];
           const azureApiKey = process.env["AZURE_OPENAI_API_KEY"];
           const deploymentId = process.env["AZURE_OPENAI_DEPLOYMENT_ID"];
-          const searchEndpoint = process.env["AZURE_AI_SEARCH_ENDPOINT"];
-          const searchKey = process.env["AZURE_AI_SEARCH_API_KEY"];
+          const searchEndpoint = process.env["AZURE_SEARCH_ENDPOINT"];
+          const searchKey = process.env["AZURE_SEARCH_API_KEY"];
           const searchIndex = process.env["AZURE_AI_SEARCH_INDEX"];
 
           if (!endpoint || !azureApiKey || !deploymentId || !searchEndpoint || !searchKey || !searchIndex) {
