@@ -5,7 +5,7 @@ const Chat = require('../models/chat');
 
 const openaiEndpoint = process.env.AZURE_OPENAI_ENDPOINT; // e.g. https://YOUR-RESOURCE.openai.azure.com
 const openaiApiKey = process.env.AZURE_OPENAI_API_KEY;
-const openaiDeployment = process.env.AZURE_OPENAI_DEPLOYMENT;
+const openaiDeployment = process.env.AZURE_OPENAI_DEPLOYMENT_ID;
 const searchEndpoint = process.env.AZURE_SEARCH_ENDPOINT;
 const searchApiKey = process.env.AZURE_SEARCH_API_KEY;
 const searchIndexName = process.env.AZURE_AI_SEARCH_INDEX;
