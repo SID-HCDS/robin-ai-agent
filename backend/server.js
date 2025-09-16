@@ -15,6 +15,8 @@ const compareRouter = require('./routes/compare');
 const feedbackRouter = require('./routes/feedback');
 const languagesRouter = require('./routes/languages');
 const paymentRouter = require('./routes/payment');
+const healthRouter = require('./routes/healthcheck');
+app.use('/api/health', healthRouter);
 
 // --- DB CONNECTION ---
 mongoose.connect(process.env.DB_CONNECTION_STRING)
