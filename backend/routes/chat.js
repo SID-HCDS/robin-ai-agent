@@ -40,7 +40,8 @@ router.post('/', async (req, res) => {
     };
 
     const endpoint = `${openaiEndpoint}/openai/deployments/${openaiDeployment}/chat/completions?api-version=2023-09-01-preview`;
-
+    console.log('DEBUG OpenAI endpoint:', endpoint);
+    console.log('DEBUG deployment name:', openaiDeployment);
     const openaiResponse = await axios.post(
       endpoint,
       payload,
