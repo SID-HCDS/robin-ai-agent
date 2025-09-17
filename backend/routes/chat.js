@@ -60,7 +60,6 @@ router.post('/', async (req, res) => {
       reply.trim() === "" ||
       reply.toLowerCase().includes("as an insurance agent") ||
       reply.toLowerCase().includes("i don't have that information") ||
-      reply.toLowerCase().includes("insurance is") ||
       reply.toLowerCase().includes("i am an ai language model")
     ) {
       reply = "Sorry, I couldn't find an answer in our documents.";
