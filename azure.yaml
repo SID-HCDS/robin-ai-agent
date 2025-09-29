@@ -1,0 +1,15 @@
+name: robin-ai-agent
+metadata:
+  template: robin-ai-agent
+services:
+  backend:
+    project: ./backend
+    language: js
+    host: appservice
+  frontend:
+    project: ./frontend
+    language: js
+    host: staticwebapp
+infra:
+  provider: arm
+  path: ./infra/main.json
