@@ -1,0 +1,108 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "envName": {
+      "type": "string",
+      "defaultValue": "dev"
+    },
+    "region": {
+      "type": "string",
+      "defaultValue": "eastus2"
+    }
+  },
+  "variables": {
+    "backendName": "[concat(parameters('envName'), 'backend')]",
+    "frontendName": "[concat(parameters('envName'), 'frontend')]",
+    "searchName": "[concat(parameters('envName'), 'search')]",
+    "cosmosName": "[concat(parameters('envName'), 'cosmos')]",
+    "speechName": "[concat(parameters('envName'), 'speech')]",
+    "blobstoreName": "[concat(parameters('envName'), 'blobstore')]",
+    "openaiName": "[concat(parameters('envName'), 'openai')]",
+    "callName": "[concat(parameters('envName'), 'call')]",
+    "insightsName": "[concat(parameters('envName'), 'insights')]",
+    "actionGroupName": "[concat(parameters('envName'), 'ActionGroup')]",
+    "serverFarmName": "[concat('ASP-', parameters('envName'), 'Group')]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2024-11-01",
+      "name": "[variables('backendName')]",
+      "location": "[parameters('region')]"
+      // Add other properties/configs for backend site here from your original template
+    },
+    {
+      "type": "Microsoft.Web/staticSites",
+      "apiVersion": "2024-11-01",
+      "name": "[variables('frontendName')]",
+      "location": "[parameters('region')]"
+      // Add other properties/configs for frontend site here
+    },
+    {
+      "type": "Microsoft.DocumentDB/mongoClusters",
+      "apiVersion": "2025-04-01-preview",
+      "name": "[variables('cosmosName')]",
+      "location": "[parameters('region')]"
+      // Add other properties/configs for cosmos db here
+    },
+    {
+      "type": "Microsoft.Search/searchServices",
+      "apiVersion": "2025-05-01",
+      "name": "[variables('searchName')]",
+      "location": "[parameters('region')]"
+      // Add other properties/configs for search service here
+    },
+    {
+      "type": "Microsoft.CognitiveServices/accounts",
+      "apiVersion": "2025-06-01",
+      "name": "[variables('openaiName')]",
+      "location": "[parameters('region')]",
+      "kind": "OpenAI"
+      // Add other configs for OpenAI here
+    },
+    {
+      "type": "Microsoft.CognitiveServices/accounts",
+      "apiVersion": "2025-06-01",
+      "name": "[variables('speechName')]",
+      "location": "[parameters('region')]",
+      "kind": "SpeechServices"
+      // Add other configs for Speech here
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2025-01-01",
+      "name": "[variables('blobstoreName')]",
+      "location": "[parameters('region')]"
+      // Add other configs for blobstore here
+    },
+    {
+      "type": "Microsoft.Communication/CommunicationServices",
+      "apiVersion": "2025-05-01-preview",
+      "name": "[variables('callName')]",
+      "location": "[parameters('region')]"
+      // Add other configs for call service here
+    },
+    {
+      "type": "microsoft.insights/components",
+      "apiVersion": "2020-02-02",
+      "name": "[variables('insightsName')]",
+      "location": "[parameters('region')]"
+      // Add other configs for insights here
+    },
+    {
+      "type": "microsoft.insights/actionGroups",
+      "apiVersion": "2024-10-01-preview",
+      "name": "[variables('actionGroupName')]",
+      "location": "[parameters('region')]"
+      // Add other configs for action group here
+    },
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2024-11-01",
+      "name": "[variables('serverFarmName')]",
+      "location": "[parameters('region')]"
+      // Add other configs for server farm here
+    }
+  ]
+}
