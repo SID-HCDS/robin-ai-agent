@@ -65,5 +65,23 @@ robin-ai-agent/
 - Build and deploy your mobile app.
 
 ---
+# robin-ai-agent Azure Deployment
 
+## Prerequisites
+- Node.js & npm installed
+- Azure CLI installed and logged in (`az login`)
+- ARM template in `infrastructure/template.json`
+
+## Usage
+
+```sh
+npm run deploy
+```
+
+You will be prompted for:
+- Environment name (used as prefix for all resources)
+- Azure region
+- Resource group name (default: <envName>Group)
+
+Resources will be deployed per your environment. Outputs (endpoints, connection strings) are saved to `.env.<envName>`.
 **This repo is ready for professional development, business deployment, and scaling!**
